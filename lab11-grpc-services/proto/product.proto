@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package product;
+
+option go_package = "./proto;proto";
+
+// =============================================================================
+// Messages
+// =============================================================================
+
+// Product represents a catalog product.
+message Product {
+  int32  id          = 1;
+  string name        = 2;
+  string description = 3;
+  double price       = 4;
+  int32  stock       = 5;
+  string category    = 6;
+}
+
+// GetProductRequest requests a single product by ID.
+message GetProductRequest {
+  int32 id = 1;
+}
+
+// ListProductsRequest requests a list (optionally filtered).
+message ListProductsRequest {
+  string category  = 1; // optional; empty means all categories
+  int32  page_size = 2; // 0 means no limit
+}
+
+// CreateProductRequest contains data for creating a new product.
+message CreateProductRequest {
+  string name        = 1;
+  string description = 2;
+  double price       = 3;
+  int32  stock       = 4;
+  string category    = 5;
+}
+
+// DeleteProductRequest requests deletion of a product.
+message DeleteProductRequest {
+  int32 id = 1;
+}
+
+// DeleteProductResponse is the result of a delete operation.
+message DeleteProductResponse {
+  bool   success = 1;
+  string message = 2;
+}
+
+// =============================================================================
+// Service
+// =============================================================================
+
+service ProductService {
+  // GetProduct retrieves a product by ID (unary RPC).
+  rpc GetProduct(GetProductRequest) returns (Product);
+
+  // ListProducts streams products back to the client (server streaming).
+  rpc ListProducts(ListProductsRequest) returns (stream Product);
+
+  // CreateProduct creates a new product (unary RPC).
+  rpc CreateProduct(CreateProductRequest) returns (Product);
+
+  // DeleteProduct deletes a product by ID (unary RPC).
+  rpc DeleteProduct(DeleteProductRequest) returns (DeleteProductResponse);
+}
