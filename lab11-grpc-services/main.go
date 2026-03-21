@@ -1,8 +1,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"lab11/client"
+	"lab11/proto"
+	"lab11/server"
 	"log"
+	"net"
+	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // main.go — Wire the gRPC server and client together.
@@ -15,7 +25,7 @@ import (
 // STEP 2: Run `go mod tidy` to download dependencies.
 //
 // STEP 3: Uncomment the code below and implement the TODOs in server/ and client/.
-
+/*
 func main() {
 	fmt.Println("Lab 11 — gRPC Services")
 	fmt.Println()
@@ -27,24 +37,10 @@ func main() {
 	fmt.Println("  5. Run: go run .")
 	log.Println("Waiting for implementation...")
 }
-
+*/
 // Uncomment after proto generation and implementation:
-/*
-import (
-	"context"
-	"fmt"
-	"lab11/client"
-	"lab11/proto"
-	"lab11/server"
-	"log"
-	"net"
-	"time"
-
-	"google.golang.org/grpc"
-)
 
 func main() {
-	// Start gRPC server
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
@@ -63,9 +59,12 @@ func main() {
 	recoveryInterceptor := func(ctx context.Context, req interface{},
 		info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 		defer func() {
-			if r := recover(); r != nil {
+			r := recover()
+			if r != nil {
 				log.Printf("[PANIC] recovered in %s: %v", info.FullMethod, r)
 				// return internal error
+				err = status.Errorf(codes.Internal, "internal server error")
+
 			}
 		}()
 		return handler(ctx, req)
@@ -99,23 +98,54 @@ func main() {
 	// Demo
 	fmt.Println("=== Creating Products ===")
 	// TODO: Create 3 products, print each
-
+	c.CreateProduct(ctx, &proto.CreateProductRequest{
+		Name: "Macbook", Price: 599.99, Description: "Laptop", Stock: 10, Category: "Tech"})
+	c.CreateProduct(ctx, &proto.CreateProductRequest{
+		Name: "Airpods", Price: 99.99, Description: "Earbuds", Stock: 10, Category: "Tech",
+	})
+	c.CreateProduct(ctx, &proto.CreateProductRequest{
+		Name: "BMW M3", Price: 119999.99, Description: "Car", Stock: 3, Category: "Cars",
+	})
 	fmt.Println("\n=== Listing All Products ===")
 	// TODO: List all products (streaming), print each
-
+	sli, err := c.ListProducts(ctx, "")
+	if err != nil {
+		fmt.Printf("No products exist")
+	} else {
+		fmt.Println(sli)
+	}
 	fmt.Println("\n=== List Electronics ===")
 	// TODO: List only electronics
-
+	sli, err = c.ListProducts(ctx, "Tech")
+	if err != nil {
+		fmt.Printf("No products in Tech")
+	} else {
+		fmt.Println(sli)
+	}
 	fmt.Println("\n=== Get Product by ID ===")
 	// TODO: Get product with ID 1
-
+	prod, err := c.GetProduct(ctx, 1)
+	if err == nil {
+		fmt.Println(prod)
+	}
 	fmt.Println("\n=== Delete Product ===")
 	// TODO: Delete product with ID 1
+	success, msg, err := c.DeleteProduct(ctx, 1)
+	if err != nil {
+		log.Printf("Delete error: %v", err)
+	} else {
+		fmt.Printf("Deleted: success=%v message=%s\n", success, msg)
+	}
 
 	fmt.Println("\n=== Get Deleted Product (expect NotFound) ===")
 	// TODO: Try to get product 1, check for NotFound error
+	_, err = c.GetProduct(ctx, 1)
+	if client.IsNotFound(err) {
+		fmt.Println("Correctly got NotFound error for deleted product")
+	} else if err != nil {
+		log.Printf("Unexpected error: %v", err)
+	}
 
 	grpcServer.GracefulStop()
 	fmt.Println("\nDone.")
 }
-*/

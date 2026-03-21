@@ -6,10 +6,8 @@ package server
 
 // After generating, uncomment the imports and implement the TODOs.
 
-/*
 import (
 	"context"
-	"fmt"
 	"lab11/proto"
 	"sync"
 	"time"
@@ -68,10 +66,14 @@ func (s *ProductServer) GetProduct(ctx context.Context, req *proto.GetProductReq
 	defer s.mu.RUnlock()
 
 	// TODO: Look up req.Id in s.products
+	prod, ok := s.products[req.Id]
 	// TODO: If not found, return nil, status.Errorf(codes.NotFound, "product %d not found", req.Id)
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "product %d not found", req.Id)
+	}
+	copy := *prod
 	// TODO: Return a copy of the product
-	_ = req
-	return nil, status.Errorf(codes.Unimplemented, "not implemented")
+	return &copy, nil
 }
 
 // ListProducts handles server streaming ListProducts RPC.
@@ -80,7 +82,10 @@ func (s *ProductServer) ListProducts(req *proto.ListProductsRequest, stream prot
 	products := make([]*proto.Product, 0)
 	for _, p := range s.products {
 		// TODO: If req.Category != "", only include matching products
-		products = append(products, p)
+		if req.Category == "" || p.Category == req.Category {
+			products = append(products, p)
+		}
+
 	}
 	s.mu.RUnlock()
 
@@ -98,8 +103,7 @@ func (s *ProductServer) ListProducts(req *proto.ListProductsRequest, stream prot
 		time.Sleep(50 * time.Millisecond)
 
 		// TODO: stream.Send(p)
-		_ = p
-		_ = stream
+		stream.Send(p)
 	}
 	return nil
 }
@@ -107,11 +111,16 @@ func (s *ProductServer) ListProducts(req *proto.ListProductsRequest, stream prot
 // CreateProduct handles unary CreateProduct RPC.
 func (s *ProductServer) CreateProduct(ctx context.Context, req *proto.CreateProductRequest) (*proto.Product, error) {
 	// TODO: Validate req.Name is not empty — return InvalidArgument if so
+	if req.Name == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "name is required")
+	}
 	// TODO: Validate req.Price > 0
+	if req.Price <= 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "price must be greater than zero")
+	}
 	// TODO: Create product using s.createProduct(req)
-	// TODO: Return the product
-	_ = req
-	return nil, status.Errorf(codes.Unimplemented, "not implemented")
+	p := s.createProduct(req)
+	return p, nil
 }
 
 // DeleteProduct handles unary DeleteProduct RPC.
@@ -120,14 +129,16 @@ func (s *ProductServer) DeleteProduct(ctx context.Context, req *proto.DeleteProd
 	defer s.mu.Unlock()
 
 	// TODO: Check if req.Id exists in s.products
+	_, ok := s.products[req.Id]
 	// TODO: If not found, return response with success=false and message
+	if !ok {
+		return &proto.DeleteProductResponse{Message: "Id not found", Success: false}, status.Errorf(codes.NotFound, "product %d not found", req.Id)
+	}
 	// TODO: Delete from map
+	delete(s.products, req.Id)
 	// TODO: Return response with success=true
-	_ = req
-	_ = fmt.Sprintf
-	return nil, status.Errorf(codes.Unimplemented, "not implemented")
+	return &proto.DeleteProductResponse{Success: true}, nil
 }
-*/
 
 // Placeholder to keep the package compilable before proto generation.
 // Delete this file's content and uncomment the code above after running protoc.
