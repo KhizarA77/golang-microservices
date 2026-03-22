@@ -33,13 +33,12 @@ func New() *EventBus {
 func (eb *EventBus) Subscribe(eventType string, handler func(Event)) {
 	eb.mu.Lock()
 	defer eb.mu.Unlock()
-	// TODO: Append handler to eb.subscribers[eventType]
+	eb.subscribers[eventType] = append(eb.subscribers[eventType], handler)
 }
 
 // SubscribeAll registers a handler that receives ALL event types.
 func (eb *EventBus) SubscribeAll(handler func(Event)) {
-	// TODO: Subscribe with the special key "*"
-	// In Publish, always call handlers for "*" as well as the specific type
+	eb.Subscribe("*", handler)
 }
 
 // Publish dispatches an event to all subscribers asynchronously.
@@ -52,15 +51,17 @@ func (eb *EventBus) Publish(event Event) {
 	eb.mu.RLock()
 	handlers := make([]func(Event), 0)
 	// TODO: Collect handlers for event.Type
+	handlers = append(handlers, eb.subscribers[event.Type]...)
 	// TODO: Also collect handlers for "*" (SubscribeAll)
+	handlers = append(handlers, eb.subscribers["*"]...)
 	eb.mu.RUnlock()
 
 	for _, h := range handlers {
 		eb.wg.Add(1)
-		go func(handler func(Event)) {
-			defer eb.wg.Done()
-			handler(event)
-		}(h)
+		go func() {
+			h(event)
+			eb.wg.Done()
+		}()
 	}
 }
 
@@ -74,6 +75,8 @@ func (eb *EventBus) PublishSync(event Event) {
 	eb.mu.RLock()
 	handlers := make([]func(Event), 0)
 	// TODO: Same collection as Publish
+	handlers = append(handlers, eb.subscribers[event.Type]...)
+	handlers = append(handlers, eb.subscribers["*"]...)
 	eb.mu.RUnlock()
 
 	for _, h := range handlers {

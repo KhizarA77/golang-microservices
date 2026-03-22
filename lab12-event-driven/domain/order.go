@@ -52,6 +52,12 @@ func NewOrder(id, userID string, items []events.OrderItem) (*Order, error) {
 
 	// TODO: Record OrderPlaced domain event
 	// o.recordEvent(events.OrderPlaced, events.OrderPlacedPayload{...})
+	o.recordEvent(events.OrderPlaced, events.OrderPlacedPayload{
+		OrderID:    o.ID,
+		UserID:     o.UserID,
+		Items:      o.Items,
+		TotalPrice: o.TotalPrice,
+	})
 
 	return o, nil
 }
@@ -65,7 +71,13 @@ func (o *Order) Cancel(reason string) error {
 		return errors.New("cannot cancel a shipped order")
 	}
 	// TODO: Set status to "cancelled", update UpdatedAt
+	o.Status = "cancelled"
+	o.UpdatedAt = time.Now()
 	// TODO: Record OrderCancelled event
+	o.recordEvent(events.OrderCancelled, events.OrderCancelledPayload{
+		OrderID: o.ID,
+		Reason:  reason,
+	})
 	return nil
 }
 
@@ -75,8 +87,13 @@ func (o *Order) Ship(trackingNumber string) error {
 		return fmt.Errorf("cannot ship order in status %q", o.Status)
 	}
 	// TODO: Set status to "shipped", update UpdatedAt
+	o.Status = "shipped"
+	o.UpdatedAt = time.Now()
 	// TODO: Record OrderShipped event
-	_ = trackingNumber
+	o.recordEvent(events.OrderShipped, events.OrderShippedPayload{
+		OrderID:        o.ID,
+		TrackingNumber: trackingNumber,
+	})
 	return nil
 }
 
