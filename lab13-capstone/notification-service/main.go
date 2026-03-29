@@ -34,13 +34,18 @@ import (
 	"time"
 )
 
-const OrderServiceURL string = "http://localhost:8083"
+func orderServiceURL() string {
+	if url := os.Getenv("ORDER_SERVICE_URL"); url != "" {
+		return url
+	}
+	return "http://localhost:8083"
+}
 
 func main() {
 	// Start notification worker pool
 	worker := workers.NewNotificationWorker(50)
 	handler := handlers.NewNotificationHandler()
-	poller := poller.NewOrderPoller(OrderServiceURL, worker)
+	poller := poller.NewOrderPoller(orderServiceURL(), worker)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup

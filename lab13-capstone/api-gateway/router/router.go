@@ -7,17 +7,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 )
 
-var downstream = []struct {
-	name string
-	url  string
-}{
-	{"user-service", "http://localhost:8081"},
-	{"product-service", "http://localhost:8082"},
-	{"order-service", "http://localhost:8083"},
-	{"notification-service", "http://localhost:8084"},
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+func serviceURLs() (user, product, order, notification string) {
+	user         = envOr("USER_SERVICE_URL",         "http://localhost:8081")
+	product      = envOr("PRODUCT_SERVICE_URL",      "http://localhost:8082")
+	order        = envOr("ORDER_SERVICE_URL",         "http://localhost:8083")
+	notification = envOr("NOTIFICATION_SERVICE_URL", "http://localhost:8084")
+	return
 }
 
 // publicPaths don't require authentication
@@ -29,6 +35,8 @@ var publicPaths = map[string]bool{
 }
 
 func Build(rl *ratelimiter.RateLimiter) http.Handler {
+	userURL, productURL, orderURL, notifURL := serviceURLs()
+
 	mux := http.NewServeMux()
 
 	// Health check (gateway's own health)
@@ -43,9 +51,15 @@ func Build(rl *ratelimiter.RateLimiter) http.Handler {
 			Name   string `json:"name"`
 			Status string `json:"status"`
 		}
+		svcs := []struct{ name, url string }{
+			{"user-service", userURL},
+			{"product-service", productURL},
+			{"order-service", orderURL},
+			{"notification-service", notifURL},
+		}
 		client := &http.Client{Timeout: 2 * time.Second}
 		results := []serviceStatus{{Name: "api-gateway", Status: "up"}}
-		for _, svc := range downstream {
+		for _, svc := range svcs {
 			status := "down"
 			resp, err := client.Get(svc.url + "/health")
 			if err == nil {
@@ -61,16 +75,16 @@ func Build(rl *ratelimiter.RateLimiter) http.Handler {
 	})
 
 	// User Service routes
-	mux.Handle("/api/users", proxy.Handler("http://localhost:8081"))
-	mux.Handle("/api/users/", proxy.Handler("http://localhost:8081"))
+	mux.Handle("/api/users", proxy.Handler(userURL))
+	mux.Handle("/api/users/", proxy.Handler(userURL))
 
 	// Product Service routes
-	mux.Handle("/api/products", proxy.Handler("http://localhost:8082"))
-	mux.Handle("/api/products/", proxy.Handler("http://localhost:8082"))
+	mux.Handle("/api/products", proxy.Handler(productURL))
+	mux.Handle("/api/products/", proxy.Handler(productURL))
 
 	// Order Service routes
-	mux.Handle("/api/orders", proxy.Handler("http://localhost:8083"))
-	mux.Handle("/api/orders/", proxy.Handler("http://localhost:8083"))
+	mux.Handle("/api/orders", proxy.Handler(orderURL))
+	mux.Handle("/api/orders/", proxy.Handler(orderURL))
 
 	// Build middleware chain
 	// Outermost: CORS → Recovery → Logging → RequestID → RateLimit → Auth → mux

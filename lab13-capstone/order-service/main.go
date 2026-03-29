@@ -42,7 +42,11 @@ func main() {
 	store := repository.NewMemoryOrderStore()
 	uc := usecase.NewOrderUseCase(store)
 	proc := processor.NewOrderProcessor(store, bus)
-	client := clients.NewProductServiceClient("http://localhost:8082")
+	productServiceURL := os.Getenv("PRODUCT_SERVICE_URL")
+	if productServiceURL == "" {
+		productServiceURL = "http://localhost:8082"
+	}
+	client := clients.NewProductServiceClient(productServiceURL)
 	handler := handlers.NewOrderHandler(client, uc, proc, bus)
 	var workerWG sync.WaitGroup
 	proc.Start(3, &workerWG)
