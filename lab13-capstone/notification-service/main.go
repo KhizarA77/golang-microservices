@@ -20,10 +20,13 @@ package main
 //   POST /webhook/order  → Order Service calls this when order status changes (bonus)
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"log"
 	"net/http"
+	"notification-service/handlers"
+	"notification-service/poller"
+	"notification-service/workers"
 	"os"
 	"os/signal"
 	"sync"
@@ -31,164 +34,25 @@ import (
 	"time"
 )
 
-// OrderStatus mirrors order-service types
-type OrderStatus string
-
-const (
-	StatusPending    OrderStatus = "pending"
-	StatusProcessing OrderStatus = "processing"
-	StatusShipped    OrderStatus = "shipped"
-	StatusDelivered  OrderStatus = "delivered"
-	StatusCancelled  OrderStatus = "cancelled"
-)
-
-type Order struct {
-	ID     string      `json:"id"`
-	UserID string      `json:"user_id"`
-	Status OrderStatus `json:"status"`
-}
-
-// =============================================================================
-// Notification Worker Pool (Lab 03)
-// =============================================================================
-
-type Notification struct {
-	OrderID string
-	UserID  string
-	Type    string
-	Message string
-}
-
-var notificationQueue = make(chan Notification, 100)
-
-func startNotificationWorkers(n int) {
-	for i := 1; i <= n; i++ {
-		go func(workerID int) {
-			for notif := range notificationQueue {
-				// Simulate sending notification (email/SMS)
-				time.Sleep(50 * time.Millisecond)
-				log.Printf("[NOTIFICATION WORKER %d] %s for order %s (user: %s): %s",
-					workerID, notif.Type, notif.OrderID, notif.UserID, notif.Message)
-			}
-		}(i)
-	}
-}
-
-// =============================================================================
-// Order Poller
-// =============================================================================
-
-type orderPoller struct {
-	mu           sync.Mutex
-	lastStatuses map[string]OrderStatus // orderID → last known status
-}
-
-func newOrderPoller() *orderPoller {
-	return &orderPoller{lastStatuses: make(map[string]OrderStatus)}
-}
-
-func (p *orderPoller) poll() {
-	client := &http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Get("http://localhost:8083/api/orders")
-	if err != nil {
-		log.Printf("[POLLER] could not reach order service: %v", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	var orders []Order
-	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
-		log.Printf("[POLLER] decode error: %v", err)
-		return
-	}
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	for _, order := range orders {
-		lastStatus, seen := p.lastStatuses[order.ID]
-
-		if !seen {
-			// New order — send "placed" notification
-			p.lastStatuses[order.ID] = order.Status
-			notificationQueue <- Notification{
-				OrderID: order.ID,
-				UserID:  order.UserID,
-				Type:    "email",
-				Message: fmt.Sprintf("Your order %s has been placed!", order.ID),
-			}
-			continue
-		}
-
-		if lastStatus != order.Status {
-			// Status changed — send notification
-			p.lastStatuses[order.ID] = order.Status
-			msg := statusMessage(order.Status, order.ID)
-			if msg != "" {
-				notificationQueue <- Notification{
-					OrderID: order.ID,
-					UserID:  order.UserID,
-					Type:    statusNotificationType(order.Status),
-					Message: msg,
-				}
-			}
-		}
-	}
-}
-
-func statusMessage(status OrderStatus, orderID string) string {
-	switch status {
-	case StatusProcessing:
-		return fmt.Sprintf("Your order %s is being processed.", orderID)
-	case StatusShipped:
-		return fmt.Sprintf("Great news! Your order %s has shipped.", orderID)
-	case StatusDelivered:
-		return fmt.Sprintf("Your order %s has been delivered. Enjoy!", orderID)
-	case StatusCancelled:
-		return fmt.Sprintf("Your order %s has been cancelled.", orderID)
-	}
-	return ""
-}
-
-func statusNotificationType(status OrderStatus) string {
-	if status == StatusShipped || status == StatusDelivered {
-		return "sms"
-	}
-	return "email"
-}
-
-// =============================================================================
-// Webhook Handler (bonus — for when Order Service calls us)
-// =============================================================================
-
-func handleWebhook(w http.ResponseWriter, r *http.Request) {
-	// TODO: Parse incoming event from Order Service
-	// TODO: Queue notification based on event type
-	// This is an exercise — the polling approach already works above
-	w.WriteHeader(http.StatusOK)
-}
-
-func handleHealth(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintln(w, `{"status":"ok","service":"notification-service"}`)
-}
+const OrderServiceURL string = "http://localhost:8083"
 
 func main() {
 	// Start notification worker pool
-	startNotificationWorkers(2)
+	worker := workers.NewNotificationWorker(50)
+	handler := handlers.NewNotificationHandler()
+	poller := poller.NewOrderPoller(OrderServiceURL, worker)
 
-	// Start order poller
-	poller := newOrderPoller()
-	pollTicker := time.NewTicker(2 * time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
+	var pollerWG sync.WaitGroup
+	pollerWG.Add(1)
 	go func() {
-		for range pollTicker.C {
-			poller.poll()
-		}
+		defer pollerWG.Done()
+		poller.Start(ctx, 2*time.Second)
 	}()
-
+	go worker.Start(2, &wg)
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", handleHealth)
-	mux.HandleFunc("POST /webhook/order", handleWebhook)
+	handler.RegisterRoutes(mux)
 
 	srv := &http.Server{
 		Addr:    ":8084",
@@ -207,7 +71,17 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	pollTicker.Stop()
-	close(notificationQueue)
-	fmt.Println("Notification Service stopped")
+	cancel()        // 1. tell poller to stop
+	pollerWG.Wait() // 2. wait for poller to fully exit
+
+	worker.Stop() // 3. now safe to close the queue
+	wg.Wait()     // 4. drain in-flight notifications
+
+	// 5. shut down HTTP
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("shutdown error: %v", err)
+	}
+
 }

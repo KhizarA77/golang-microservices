@@ -252,6 +252,30 @@ server.Shutdown(ctx)
 
 ---
 
+## Frontend Testing Dashboard
+
+A browser-based UI is included at `frontend/index.html` for testing all services interactively — no npm or build step required.
+
+```
+lab13-capstone/
+└── frontend/
+    └── index.html   ← open directly in a browser
+```
+
+**Features:**
+
+| Tab | What you can do |
+|-----|-----------------|
+| **Health** | Live up/down status for all 5 services (routed via gateway) |
+| **Auth** | Register, login, logout — token auto-saved to `localStorage` |
+| **Products** | List (paginated), search, get by ID, create, update, delete |
+| **Orders** | Place an order, list all orders with status badges, get by ID |
+| **Users** | List, get by ID, update name, delete |
+
+All requests go through the API Gateway on `:8080`. The gateway has CORS enabled so the browser can call it freely. Open `frontend/index.html` in any browser after starting the services.
+
+---
+
 ## Running the Capstone
 
 ```bash

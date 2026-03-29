@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab13 Capstone — Service Dashboard</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f1117; --bg2: #1a1d27; --bg3: #242736;
+      --border: #2e3147; --accent: #6c63ff; --accent2: #4ade80;
+      --danger: #f87171; --warn: #fbbf24;
+      --text: #e2e8f0; --text2: #94a3b8; --text3: #64748b;
+      --radius: 8px; --radius2: 12px;
+    }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    /* Layout */
+    .app { display: flex; flex-direction: column; min-height: 100vh; }
+    header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; gap: 32px; height: 56px; position: sticky; top: 0; z-index: 100; }
+    header h1 { font-size: 16px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+    nav { display: flex; gap: 4px; flex: 1; }
+    nav button { background: none; border: none; color: var(--text2); padding: 6px 14px; border-radius: var(--radius); cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.15s; }
+    nav button:hover { background: var(--bg3); color: var(--text); }
+    nav button.active { background: var(--accent); color: white; }
+    .auth-badge { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text2); white-space: nowrap; }
+    .auth-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); }
+    .auth-badge .dot.on { background: var(--accent2); }
+    main { flex: 1; padding: 24px; max-width: 1200px; margin: 0 auto; width: 100%; }
+    /* Cards */
+    .card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius2); padding: 20px; }
+    .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: var(--text); }
+    .card h3 { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; }
+    .grid { display: grid; gap: 16px; }
+    .grid-2 { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+    /* Forms */
+    .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .form-group label { font-size: 12px; font-weight: 500; color: var(--text2); }
+    input, select, textarea { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; color: var(--text); font-size: 14px; width: 100%; outline: none; transition: border-color 0.15s; }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    textarea { resize: vertical; min-height: 80px; font-family: inherit; }
+    .row { display: flex; gap: 8px; }
+    .row input { flex: 1; }
+    /* Buttons */
+    btn, .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius); font-size: 14px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; }
+    .btn { display: inline-flex; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #5b52e8; }
+    .btn-success { background: #16a34a; color: white; }
+    .btn-success:hover { background: #15803d; }
+    .btn-danger { background: #dc2626; color: white; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-ghost { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    /* Response box */
+    .response { margin-top: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; max-height: 280px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+    .response.ok { border-color: #16a34a; }
+    .response.err { border-color: var(--danger); }
+    .status-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .status-ok { background: #14532d; color: var(--accent2); }
+    .status-err { background: #450a0a; color: var(--danger); }
+    /* Health cards */
+    .health-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius2); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; }
+    .health-card .svc-name { font-size: 14px; font-weight: 600; }
+    .health-card .svc-port { font-size: 12px; color: var(--text3); margin-top: 2px; }
+    .health-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--text3); flex-shrink: 0; }
+    .health-dot.up { background: var(--accent2); box-shadow: 0 0 8px #4ade8066; }
+    .health-dot.down { background: var(--danger); }
+    /* Product / Order table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 8px 12px; color: var(--text3); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:hover td { background: var(--bg3); }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-pending { background: #422006; color: var(--warn); }
+    .badge-processing { background: #1e3a5f; color: #60a5fa; }
+    .badge-shipped { background: #1e1b4b; color: #a78bfa; }
+    .badge-delivered { background: #14532d; color: var(--accent2); }
+    .badge-cancelled { background: #450a0a; color: var(--danger); }
+    /* Tabs within a section */
+    .sub-tabs { display: flex; gap: 4px; margin-bottom: 16px; background: var(--bg3); padding: 4px; border-radius: var(--radius); width: fit-content; }
+    .sub-tabs button { background: none; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--text2); font-weight: 500; transition: all 0.15s; }
+    .sub-tabs button.active { background: var(--bg2); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+    /* Misc */
+    .sep { height: 1px; background: var(--border); margin: 16px 0; }
+    .empty { color: var(--text3); font-size: 13px; padding: 20px 0; text-align: center; }
+    .tag { font-size: 11px; padding: 2px 6px; background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; color: var(--text2); }
+    .flex { display: flex; }
+    .items-center { align-items: center; }
+    .gap-2 { gap: 8px; }
+    .gap-4 { gap: 16px; }
+    .mb-2 { margin-bottom: 8px; }
+    .mb-4 { margin-bottom: 16px; }
+    .mt-2 { margin-top: 8px; }
+    .flex-1 { flex: 1; }
+    .font-mono { font-family: 'Consolas', monospace; font-size: 12px; }
+    .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+
+const BASE = 'http://localhost:8080';
+
+// ── Auth helpers ────────────────────────────────────────────────────────────
+const getToken = () => localStorage.getItem('token');
+const setToken = (t) => t ? localStorage.setItem('token', t) : localStorage.removeItem('token');
+const getUser  = () => { try { return JSON.parse(localStorage.getItem('user') || 'null'); } catch { return null; } };
+const setUser  = (u) => u ? localStorage.setItem('user', JSON.stringify(u)) : localStorage.removeItem('user');
+
+async function apiFetch(path, opts = {}) {
+  const token = getToken();
+  const headers = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(opts.headers || {}) };
+  const res = await fetch(BASE + path, { ...opts, headers });
+  const text = await res.text();
+  let body;
+  try { body = JSON.parse(text); } catch { body = text; }
+  return { ok: res.ok, status: res.status, body };
+}
+
+// ── Small components ─────────────────────────────────────────────────────────
+const ResponseBox = ({ result }) => {
+  if (!result) return null;
+  const cls = result.ok ? 'response ok' : 'response err';
+  return (
+    <div>
+      <span className={`status-tag ${result.ok ? 'status-ok' : 'status-err'}`}>
+        {result.status} {result.ok ? 'OK' : 'ERROR'}
+      </span>
+      <div className={cls}>{JSON.stringify(result.body, null, 2)}</div>
+    </div>
+  );
+};
+
+const StatusBadge = ({ status }) => {
+  const cls = { pending: 'badge-pending', processing: 'badge-processing', shipped: 'badge-shipped', delivered: 'badge-delivered', cancelled: 'badge-cancelled' }[status?.toLowerCase()] || '';
+  return <span className={`badge ${cls}`}>{status || '—'}</span>;
+};
+
+// ── Health Tab ───────────────────────────────────────────────────────────────
+const PORTS = { 'api-gateway': 8080, 'user-service': 8081, 'product-service': 8082, 'order-service': 8083, 'notification-service': 8084 };
+
+const HealthTab = () => {
+  const [statuses, setStatuses] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const check = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiFetch('/health/all');
+      if (r.ok && Array.isArray(r.body)) setStatuses(r.body);
+    } catch {}
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { check(); }, []);
+
+  return (
+    <div>
+      <div className="flex items-center gap-4 mb-4" style={{ justifyContent: 'space-between' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700 }}>Service Health</h2>
+        <button className="btn btn-ghost btn-sm" onClick={check} disabled={loading}>
+          {loading ? 'Checking…' : 'Refresh'}
+        </button>
+      </div>
+      <div className="grid grid-3" style={{ gap: 12 }}>
+        {statuses.map(svc => (
+          <div className="health-card" key={svc.name}>
+            <div>
+              <div className="svc-name">{svc.name}</div>
+              <div className="svc-port">{PORTS[svc.name] ? `:${PORTS[svc.name]}` : ''}</div>
+            </div>
+            <div className={`health-dot ${svc.status === 'up' ? 'up' : 'down'}`} />
+          </div>
+        ))}
+        {statuses.length === 0 && !loading && (
+          <div className="empty" style={{ gridColumn: '1/-1' }}>Gateway unreachable — is it running?</div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── Auth Tab ─────────────────────────────────────────────────────────────────
+const AuthTab = ({ onAuthChange }) => {
+  const [tab, setTab] = useState('login');
+  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const user = getUser();
+
+  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const register = async () => {
+    setLoading(true);
+    const r = await apiFetch('/api/users/register', { method: 'POST', body: JSON.stringify({ name: form.name, email: form.email, password: form.password }) });
+    setResult(r);
+    setLoading(false);
+  };
+
+  const login = async () => {
+    setLoading(true);
+    const r = await apiFetch('/api/users/login', { method: 'POST', body: JSON.stringify({ email: form.email, password: form.password }) });
+    if (r.ok && r.body.token) {
+      setToken(r.body.token);
+      setUser(r.body.user);
+      onAuthChange();
+    }
+    setResult(r);
+    setLoading(false);
+  };
+
+  const logout = () => { setToken(null); setUser(null); setResult(null); onAuthChange(); };
+
+  return (
+    <div className="grid grid-2">
+      <div className="card">
+        <h2>Authentication</h2>
+        {user && (
+          <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Logged in as <span style={{ color: 'var(--accent2)' }}>{user.Name || user.name}</span></div>
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>{user.Email || user.email}</div>
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>ID: {user.ID || user.id}</div>
+            <button className="btn btn-danger btn-sm" style={{ marginTop: 10 }} onClick={logout}>Logout</button>
+          </div>
+        )}
+        <div className="sub-tabs">
+          <button className={tab === 'login' ? 'active' : ''} onClick={() => setTab('login')}>Login</button>
+          <button className={tab === 'register' ? 'active' : ''} onClick={() => setTab('register')}>Register</button>
+        </div>
+        {tab === 'register' && (
+          <div className="form-group">
+            <label>Name</label>
+            <input placeholder="Alice" value={form.name} onChange={set('name')} />
+          </div>
+        )}
+        <div className="form-group">
+          <label>Email</label>
+          <input type="email" placeholder="alice@example.com" value={form.email} onChange={set('email')} />
+        </div>
+        <div className="form-group">
+          <label>Password</label>
+          <input type="password" placeholder="••••••••" value={form.password} onChange={set('password')} />
+        </div>
+        <button className="btn btn-primary" onClick={tab === 'login' ? login : register} disabled={loading}>
+          {loading ? 'Loading…' : tab === 'login' ? 'Login' : 'Register'}
+        </button>
+        <ResponseBox result={result} />
+      </div>
+
+      <div className="card">
+        <h2>Token Inspector</h2>
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>Current Bearer token (from localStorage)</div>
+        <div className="response" style={{ marginTop: 0 }}>{getToken() || '— not logged in —'}</div>
+        {getToken() && (
+          <>
+            <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text3)' }}>Decoded payload</div>
+            <div className="response" style={{ marginTop: 4 }}>{(() => { try { return atob(getToken() || ''); } catch { return 'invalid'; } })()}</div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── Products Tab ─────────────────────────────────────────────────────────────
+const ProductsTab = () => {
+  const [tab, setTab] = useState('list');
+  const [products, setProducts] = useState([]);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [searchQ, setSearchQ] = useState('');
+  const [form, setForm] = useState({ name: '', description: '', price: '', stock: '', category: '' });
+  const [updateForm, setUpdateForm] = useState({ id: '', name: '', price: '', stock: '' });
+  const [getID, setGetID] = useState('');
+  const [deleteID, setDeleteID] = useState('');
+  const [page, setPage] = useState(1);
+
+  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+  const setU = (k) => (e) => setUpdateForm(f => ({ ...f, [k]: e.target.value }));
+
+  const listProducts = async () => {
+    setLoading(true);
+    const r = await apiFetch(`/api/products?page=${page}&limit=10`);
+    if (r.ok) setProducts(r.body.data || r.body || []);
+    setResult(r);
+    setLoading(false);
+  };
+
+  const searchProducts = async () => {
+    if (!searchQ) return;
+    setLoading(true);
+    const r = await apiFetch(`/api/products/search?q=${encodeURIComponent(searchQ)}`);
+    if (r.ok) setProducts(Array.isArray(r.body) ? r.body : []);
+    setResult(r);
+    setLoading(false);
+  };
+
+  const getProduct = async () => {
+    setLoading(true);
+    const r = await apiFetch(`/api/products/${getID}`);
+    setResult(r);
+    setLoading(false);
+  };
+
+  const createProduct = async () => {
+    setLoading(true);
+    const r = await apiFetch('/api/products', {
+      method: 'POST',
+      body: JSON.stringify({ name: form.name, description: form.description, price: parseFloat(form.price) || 0, stock: parseInt(form.stock) || 0, category: form.category })
+    });
+    setResult(r);
+    if (r.ok) listProducts();
+    setLoading(false);
+  };
+
+  const updateProduct = async () => {
+    setLoading(true);
+    const body = {};
+    if (updateForm.name) body.name = updateForm.name;
+    if (updateForm.price) body.price = parseFloat(updateForm.price);
+    if (updateForm.stock) body.stock = parseInt(updateForm.stock);
+    const r = await apiFetch(`/api/products/${updateForm.id}`, { method: 'PATCH', body: JSON.stringify(body) });
+    setResult(r);
+    if (r.ok) listProducts();
+    setLoading(false);
+  };
+
+  const deleteProduct = async () => {
+    setLoading(true);
+    const r = await apiFetch(`/api/products/${deleteID}`, { method: 'DELETE' });
+    setResult(r);
+    if (r.ok) listProducts();
+    setLoading(false);
+  };
+
+  useEffect(() => { listProducts(); }, [page]);
+
+  return (
+    <div>
+      <div className="sub-tabs mb-4">
+        {['list', 'search', 'get', 'create', 'update', 'delete'].map(t => (
+          <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
+            {t.charAt(0).toUpperCase() + t.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'list' && (
+        <div className="card">
+          <div className="flex items-center gap-4 mb-4" style={{ justifyContent: 'space-between' }}>
+            <h2>Products</h2>
+            <div className="flex gap-2 items-center">
+              <button className="btn btn-ghost btn-sm" onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1}>← Prev</button>
+              <span style={{ fontSize: 13, color: 'var(--text2)' }}>Page {page}</span>
+              <button className="btn btn-ghost btn-sm" onClick={() => setPage(p => p+1)}>Next →</button>
+              <button className="btn btn-primary btn-sm" onClick={listProducts} disabled={loading}>Refresh</button>
+            </div>
+          </div>
+          {products.length === 0 ? <div className="empty">No products. Create some below!</div> : (
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Description</th></tr></thead>
+                <tbody>
+                  {products.map(p => (
+                    <tr key={p.id}>
+                      <td className="font-mono" style={{ color: 'var(--text3)' }}>{p.id}</td>
+                      <td style={{ fontWeight: 500 }}>{p.name}</td>
+                      <td><span className="tag">{p.category || '—'}</span></td>
+                      <td style={{ color: 'var(--accent2)' }}>${Number(p.price).toFixed(2)}</td>
+                      <td>{p.stock}</td>
+                      <td className="truncate" style={{ color: 'var(--text3)' }}>{p.description}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <ResponseBox result={result} />
+        </div>
+      )}
+
+      {tab === 'search' && (
+        <div className="card">
+          <h2>Search Products</h2>
+          <div className="row mb-4">
+            <input placeholder="Search query…" value={searchQ} onChange={e => setSearchQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && searchProducts()} />
+            <button className="btn btn-primary" onClick={searchProducts} disabled={loading}>Search</button>
+          </div>
+          {products.length > 0 && (
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th></tr></thead>
+                <tbody>
+                  {products.map(p => (
+                    <tr key={p.id}>
+                      <td className="font-mono" style={{ color: 'var(--text3)' }}>{p.id}</td>
+                      <td style={{ fontWeight: 500 }}>{p.name}</td>
+                      <td><span className="tag">{p.category || '—'}</span></td>
+                      <td style={{ color: 'var(--accent2)' }}>${Number(p.price).toFixed(2)}</td>
+                      <td>{p.stock}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <ResponseBox result={result} />
+        </div>
+      )}
+
+      {tab === 'get' && (
+        <div className="card">
+          <h2>Get Product by ID</h2>
+          <div className="row mb-4">
+            <input placeholder="Product ID (number)" value={getID} onChange={e => setGetID(e.target.value)} />
+            <button className="btn btn-primary" onClick={getProduct} disabled={loading}>Fetch</button>
+          </div>
+          <ResponseBox result={result} />
+        </div>
+      )}
+
+      {tab === 'create' && (
+        <div className="card">
+          <h2>Create Product</h2>
+          <div className="form-group"><label>Name</label><input placeholder="Widget Pro" value={form.name} onChange={set('name')} /></div>
+          <div className="form-group"><label>Description</label><textarea placeholder="Product description…" value={form.description} onChange={set('description')} /></div>
+          <div className="flex gap-2 mb-2">
+            <div className="form-group flex-1"><label>Price ($)</label><input type="number" placeholder="9.99" value={form.price} onChange={set('price')} /></div>
+            <div className="form-group flex-1"><label>Stock</label><input type="number" placeholder="100" value={form.stock} onChange={set('stock')} /></div>
+          </div>
+          <div className="form-group"><label>Category</label><input placeholder="electronics" value={form.category} onChange={set('category')} /></div>
+          <button className="btn btn-success" onClick={createProduct} disabled={loading}>Create Product</button>
+          <ResponseBox result={result} />
+        </div>
+      )}
+
+      {tab === 'update' && (
+        <div className="card">
+          <h2>Update Product</h2>
+          <div className="form-group"><label>Product ID</label><input placeholder="1" value={updateForm.id} onChange={setU('id')} /></div>
+          <div className="form-group"><label>New Name (optional)</label><input placeholder="leave blank to skip" value={updateForm.name} onChange={setU('name')} /></div>
+          <div className="flex gap-2 mb-2">
+            <div className="form-group flex-1"><label>New Price (optional)</label><input type="number" placeholder="leave blank to skip" value={updateForm.price} onChange={setU('price')} /></div>
+            <div className="form-group flex-1"><label>New Stock (optional)</label><input type="number" placeholder="leave blank to skip" value={updateForm.stock} onChange={setU('stock')} /></div>
+          </div>
+          <button className="btn btn-primary" onClick={updateProduct} disabled={loading}>Update</button>
+          <ResponseBox result={result} />
+        </div>
+      )}
+
+      {tab === 'delete' && (
+        <div className="card">
+          <h2>Delete Product</h2>
+          <div className="row mb-4">
+            <input placeholder="Product ID" value={deleteID} onChange={e => setDeleteID(e.target.value)} />
+            <button className="btn btn-danger" onClick={deleteProduct} disabled={loading}>Delete</button>
+          </div>
+          <ResponseBox result={result} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Orders Tab ────────────────────────────────────────────────────────────────
+const OrdersTab = () => {
+  const [tab, setTab] = useState('list');
+  const [orders, setOrders] = useState([]);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({ productId: '', quantity: '', userId: '' });
+  const [getID, setGetID] = useState('');
+  const user = getUser();
+
+  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const listOrders = async () => {
+    setLoading(true);
+    const r = await apiFetch('/api/orders');
+    if (r.ok) setOrders(Array.isArray(r.body) ? r.body : []);
+    setResult(r);
+    setLoading(false);
+  };
+
+  const getOrder = async () => {
+    setLoading(true);
+    const r = await apiFetch(`/api/orders/${getID}`);
+    setResult(r);
+    setLoading(false);
+  };
+
+  const placeOrder = async () => {
+    setLoading(true);
+    const r = await apiFetch('/api/orders', {
+      method: 'POST',
+      body: JSON.stringify({ productId: form.productId, quantity: parseInt(form.quantity) || 1, userId: form.userId || user?.ID || user?.id || 'user1' })
+    });
+    setResult(r);
+    if (r.ok) { setTab('list'); listOrders(); }
+    setLoading(false);
+  };
+
+  useEffect(() => { if (tab === 'list') listOrders(); }, [tab]);
+
+  return (
+    <div>
+      <div className="sub-tabs mb-4">
+        {['list', 'place', 'get'].map(t => (
+          <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
+            {t === 'list' ? 'List Orders' : t === 'place' ? 'Place Order' : 'Get by ID'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'list' && (
+        <div className="card">
+          <div className="flex items-center gap-4 mb-4" style={{ justifyContent: 'space-between' }}>
+            <h2>Orders</h2>
+            <button className="btn btn-primary btn-sm" onClick={listOrders} disabled={loading}>Refresh</button>
+          </div>
+          {orders.length === 0 ? <div className="empty">No orders yet. Place one!</div> : (
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>ID</th><th>Product</th><th>User</th><th>Qty</th><th>Total</th><th>Status</th><th>Created</th></tr></thead>
+                <tbody>
+                  {orders.map(o => (
+                    <tr key={o.id}>
+                      <td className="font-mono truncate" style={{ color: 'var(--text3)', maxWidth: 120 }}>{o.id}</td>
+                      <td style={{ fontWeight: 500 }}>{o.productName || o.product_name || o.productId}</td>
+                      <td className="truncate">{o.userId || o.user_id}</td>
+                      <td>{o.quantity}</td>
+                      <td style={{ color: 'var(--accent2)' }}>${Number(o.totalPrice || o.total_price || 0).toFixed(2)}</td>
+                      <td><StatusBadge status={o.status} /></td>
+                      <td style={{ color: 'var(--text3)', fontSize: 11 }}>{o.createdAt ? new Date(o.createdAt).toLocaleString() : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <ResponseBox result={result} />
+        </div>
+      )}
+
+      {tab === 'place' && (
+        <div className="card">
+          <h2>Place Order</h2>
+          {!getToken() && <div style={{ color: 'var(--warn)', fontSize: 13, marginBottom: 12 }}>⚠ You must be logged in to place an order.</div>}
+          <div className="form-group"><label>Product ID (number)</label><input placeholder="1" value={form.productId} onChange={set('productId')} /></div>
+          <div className="form-group"><label>Quantity</label><input type="number" placeholder="1" value={form.quantity} onChange={set('quantity')} /></div>
+          <div className="form-group">
+            <label>User ID</label>
+            <input placeholder={user?.ID || user?.id || 'e.g. abc123'} value={form.userId} onChange={set('userId')} />
+            {user && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Auto-filled from logged-in user if blank</div>}
+          </div>
+          <button className="btn btn-success" onClick={placeOrder} disabled={loading || !getToken()}>Place Order</button>
+          <ResponseBox result={result} />
+        </div>
+      )}
+
+      {tab === 'get' && (
+        <div className="card">
+          <h2>Get Order by ID</h2>
+          <div className="row mb-4">
+            <input placeholder="Order UUID" value={getID} onChange={e => setGetID(e.target.value)} />
+            <button className="btn btn-primary" onClick={getOrder} disabled={loading}>Fetch</button>
+          </div>
+          <ResponseBox result={result} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Users Tab ────────────────────────────────────────────────────────────────
+const UsersTab = () => {
+  const [tab, setTab] = useState('list');
+  const [users, setUsers] = useState([]);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [getID, setGetID] = useState('');
+  const [updateForm, setUpdateForm] = useState({ id: '', name: '' });
+  const [deleteID, setDeleteID] = useState('');
+
+  const setU = (k) => (e) => setUpdateForm(f => ({ ...f, [k]: e.target.value }));
+
+  const listUsers = async () => {
+    setLoading(true);
+    const r = await apiFetch('/api/users');
+    if (r.ok) setUsers(Array.isArray(r.body) ? r.body : []);
+    setResult(r);
+    setLoading(false);
+  };
+
+  const getUser2 = async () => {
+    setLoading(true);
+    const r = await apiFetch(`/api/users/${getID}`);
+    setResult(r);
+    setLoading(false);
+  };
+
+  const updateUser = async () => {
+    setLoading(true);
+    const r = await apiFetch(`/api/users/${updateForm.id}`, { method: 'PUT', body: JSON.stringify({ name: updateForm.name }) });
+    setResult(r);
+    if (r.ok) listUsers();
+    setLoading(false);
+  };
+
+  const deleteUser = async () => {
+    setLoading(true);
+    const r = await apiFetch(`/api/users/${deleteID}`, { method: 'DELETE' });
+    setResult(r);
+    if (r.ok) listUsers();
+    setLoading(false);
+  };
+
+  useEffect(() => { if (tab === 'list') listUsers(); }, [tab]);
+
+  return (
+    <div>
+      <div className="sub-tabs mb-4">
+        {['list', 'get', 'update', 'delete'].map(t => (
+          <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
+            {t.charAt(0).toUpperCase() + t.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'list' && (
+        <div className="card">
+          <div className="flex items-center gap-4 mb-4" style={{ justifyContent: 'space-between' }}>
+            <h2>Users</h2>
+            <button className="btn btn-primary btn-sm" onClick={listUsers} disabled={loading}>Refresh</button>
+          </div>
+          {!getToken() && <div style={{ color: 'var(--warn)', fontSize: 13, marginBottom: 12 }}>⚠ Must be logged in to list users.</div>}
+          {users.length === 0 ? <div className="empty">No users.</div> : (
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Active</th><th>Created</th></tr></thead>
+                <tbody>
+                  {users.map(u => (
+                    <tr key={u.ID || u.id}>
+                      <td className="font-mono truncate" style={{ color: 'var(--text3)', maxWidth: 120 }}>{u.ID || u.id}</td>
+                      <td style={{ fontWeight: 500 }}>{u.Name || u.name}</td>
+                      <td>{u.Email || u.email}</td>
+                      <td><span className={`badge ${u.Active || u.active ? 'badge-delivered' : 'badge-cancelled'}`}>{String(u.Active ?? u.active)}</span></td>
+                      <td style={{ color: 'var(--text3)', fontSize: 11 }}>{u.CreatedAt ? new Date(u.CreatedAt).toLocaleString() : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <ResponseBox result={result} />
+        </div>
+      )}
+
+      {tab === 'get' && (
+        <div className="card">
+          <h2>Get User by ID</h2>
+          <div className="row mb-4">
+            <input placeholder="User UUID" value={getID} onChange={e => setGetID(e.target.value)} />
+            <button className="btn btn-primary" onClick={getUser2} disabled={loading}>Fetch</button>
+          </div>
+          <ResponseBox result={result} />
+        </div>
+      )}
+
+      {tab === 'update' && (
+        <div className="card">
+          <h2>Update User Name</h2>
+          <div className="form-group"><label>User ID</label><input placeholder="UUID" value={updateForm.id} onChange={setU('id')} /></div>
+          <div className="form-group"><label>New Name</label><input placeholder="Bob" value={updateForm.name} onChange={setU('name')} /></div>
+          <button className="btn btn-primary" onClick={updateUser} disabled={loading}>Update</button>
+          <ResponseBox result={result} />
+        </div>
+      )}
+
+      {tab === 'delete' && (
+        <div className="card">
+          <h2>Delete User</h2>
+          <div className="row mb-4">
+            <input placeholder="User UUID" value={deleteID} onChange={e => setDeleteID(e.target.value)} />
+            <button className="btn btn-danger" onClick={deleteUser} disabled={loading}>Delete</button>
+          </div>
+          <ResponseBox result={result} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── App ───────────────────────────────────────────────────────────────────────
+const TABS = ['Health', 'Auth', 'Products', 'Orders', 'Users'];
+
+const App = () => {
+  const [tab, setTab] = useState('Health');
+  const [, forceUpdate] = useState(0);
+  const user = getUser();
+
+  return (
+    <div className="app">
+      <header>
+        <h1>Lab13 Capstone</h1>
+        <nav>
+          {TABS.map(t => (
+            <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>{t}</button>
+          ))}
+        </nav>
+        <div className="auth-badge">
+          <div className={`dot ${user ? 'on' : ''}`} />
+          <span>{user ? (user.Name || user.name) : 'Not logged in'}</span>
+        </div>
+      </header>
+      <main>
+        {tab === 'Health'   && <HealthTab />}
+        {tab === 'Auth'     && <AuthTab onAuthChange={() => forceUpdate(n => n + 1)} />}
+        {tab === 'Products' && <ProductsTab />}
+        {tab === 'Orders'   && <OrdersTab />}
+        {tab === 'Users'    && <UsersTab />}
+      </main>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
